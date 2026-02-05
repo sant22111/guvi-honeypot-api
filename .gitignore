@@ -1,6 +1,11 @@
 # Environment variables
 .env
 
+# Old/Legacy files
+main.py
+test_*.py
+check_*.py
+
 # Python
 __pycache__/
 *.py[cod]
