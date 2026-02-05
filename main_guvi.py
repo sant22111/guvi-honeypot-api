@@ -140,13 +140,8 @@ def generate_honeypot_reply(message_text: str, conversation_history: List[Messag
     
     # Try Grok API if available
     xai_api_key = os.getenv("XAI_API_KEY")
-    if xai_api_key:
+    if xai_api_key and xai_api_key.startswith("xai-"):
         try:
-            client = OpenAI(
-                api_key=xai_api_key,
-                base_url="https://api.x.ai/v1"
-            )
-            
             # Build conversation context
             context = ""
             for msg in conversation_history[-5:]:  # Last 5 messages for context
@@ -170,18 +165,31 @@ Generate a natural reply that:
 Language: {language}
 Reply:"""
             
-            response = client.chat.completions.create(
-                model=os.getenv("XAI_MODEL", "grok-3"),
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
-                temperature=0.7,
-                max_tokens=150
+            # Use requests library directly to avoid OpenAI client issues
+            response = requests.post(
+                "https://api.x.ai/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {xai_api_key}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": os.getenv("XAI_MODEL", "grok-3"),
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt}
+                    ],
+                    "temperature": 0.7,
+                    "max_tokens": 150
+                },
+                timeout=10
             )
             
-            reply = response.choices[0].message.content.strip()
-            return reply
+            if response.status_code == 200:
+                data = response.json()
+                reply = data["choices"][0]["message"]["content"].strip()
+                return reply
+            else:
+                print(f"Grok API error: Status {response.status_code}")
             
         except Exception as e:
             print(f"Grok API error: {e}")
